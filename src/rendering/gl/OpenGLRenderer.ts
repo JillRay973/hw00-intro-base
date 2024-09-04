@@ -6,8 +6,11 @@ import ShaderProgram from './ShaderProgram';
 
 // In this file, `gl` is accessible because it is imported above
 class OpenGLRenderer {
-  constructor(public canvas: HTMLCanvasElement) {
-  }
+  uniformColor: vec4 = vec4.fromValues(1, 0, 0, 1);
+  time: number = 0;
+  prevTime: number = new Date().getTime();
+
+  constructor(public canvas: HTMLCanvasElement) {}
 
   setClearColor(r: number, g: number, b: number, a: number) {
     gl.clearColor(r, g, b, a);
@@ -22,16 +25,24 @@ class OpenGLRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
 
+  setUniformColor(color255: number[]) {
+    this.uniformColor = vec4.fromValues(color255[0] / 255, color255[1] / 255, color255[2] / 255, 1);
+  }
+
   render(camera: Camera, prog: ShaderProgram, drawables: Array<Drawable>) {
     let model = mat4.create();
     let viewProj = mat4.create();
-    let color = vec4.fromValues(1, 0, 0, 1);
 
     mat4.identity(model);
     mat4.multiply(viewProj, camera.projectionMatrix, camera.viewMatrix);
     prog.setModelMatrix(model);
     prog.setViewProjMatrix(viewProj);
-    prog.setGeometryColor(color);
+    prog.setGeometryColor(this.uniformColor);
+
+    let currentTime = new Date().getTime();
+    this.time += currentTime - this.prevTime;
+    this.prevTime = currentTime;
+    prog.setTime(this.time);
 
     for (let drawable of drawables) {
       prog.draw(drawable);
