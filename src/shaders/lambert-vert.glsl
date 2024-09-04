@@ -1,5 +1,8 @@
 #version 300 es
 
+// #define DISPLACEMENT
+float displacementScale = 0.4;
+
 //This is a vertex shader. While it is called a "shader" due to outdated conventions, this file
 //is used to apply matrix transformations to the arrays of vertex data passed to it.
 //Since this code is run on your GPU, each vertex is transformed simultaneously.
@@ -23,18 +26,21 @@ in vec4 vs_Pos;             // The array of vertex positions passed to the shade
 
 in vec4 vs_Nor;             // The array of vertex normals passed to the shader
 
-in vec4 vs_Col;             // The array of vertex colors passed to the shader.
+uniform vec4 u_Color;
 
-out vec4 fs_Nor;            // The array of normals that has been transformed by u_ModelInvTr. This is implicitly passed to the fragment shader.
-out vec4 fs_LightVec;       // The direction in which our virtual light lies, relative to each vertex. This is implicitly passed to the fragment shader.
-out vec4 fs_Col;            // The color of each vertex. This is implicitly passed to the fragment shader.
+out vec4 fs_Nor;
+out vec4 fs_LightVec;
+out vec4 fs_Col;
+out vec4 fs_Pos;
 
 const vec4 lightPos = vec4(5, 5, 3, 1); //The position of our virtual light, which is used to compute the shading of
                                         //the geometry in the fragment shader.
 
+uniform float u_Time;
+
 void main()
 {
-    fs_Col = vs_Col;                         // Pass the vertex colors to the fragment shader for interpolation
+    fs_Col = u_Color;
 
     mat3 invTranspose = mat3(u_ModelInvTr);
     fs_Nor = vec4(invTranspose * vec3(vs_Nor), 0);          // Pass the vertex normals to the fragment shader for interpolation.
@@ -46,8 +52,26 @@ void main()
 
     vec4 modelposition = u_Model * vs_Pos;   // Temporarily store the transformed vertex positions for use below
 
-    fs_LightVec = lightPos - modelposition;  // Compute the direction in which the light source lies
+    vec4 displacedPos = modelposition;
 
-    gl_Position = u_ViewProj * modelposition;// gl_Position is a built-in variable of OpenGL which is
+#ifdef DISPLACEMENT
+    displacedPos.y *= mix(0.1, 0.8, (cos(float(u_Time) / 500.0) + 1.0) / 2.0);
+    displacedPos.x += sin(float(u_Time) / 250.0 + displacedPos.y);
+    displacedPos.z += 2.0 * (sin(displacedPos.y) + cos(displacedPos.x));
+
+    float uvScale = 10.0;
+    float displacementNormal = sin(displacedPos.x * uvScale) + cos(displacedPos.y * uvScale) + sin(displacedPos.z * uvScale);
+    displacedPos += displacementNormal * vs_Nor * 0.2;
+
+    float displacementFactor = abs(fract(float(u_Time) / 7682.39) * 2.0 - 1.0);
+    displacementFactor = smoothstep(0., 1., displacementFactor) * displacementScale;
+    displacedPos = mix(modelposition, displacedPos, displacementFactor);
+#endif
+
+    fs_LightVec = lightPos - displacedPos;  // Compute the direction in which the light source lies
+
+    fs_Pos = displacedPos;
+
+    gl_Position = u_ViewProj * displacedPos; // gl_Position is a built-in variable of OpenGL which is
                                              // used to render the final positions of the geometry's vertices
 }
